@@ -28,6 +28,7 @@ import iris_interface.IrisInterfaceStatus as InterfaceStatus
 from iris_interface.IrisModuleInterface import IrisModuleInterface, IrisModuleTypes
 from app.datamgmt.iris_engine.modules_db import module_list_available_hooks
 from app.schema.marshables import AlertSchema, CaseDetailsSchema, CaseAssetsSchema, CaseNoteSchema, IocSchema, EventSchema, CaseEvidenceSchema, CaseTaskSchema
+from jinja2 import Environment
 import iris_webhooks_module.IrisWebHooksConfig as interface_conf
 
 
@@ -256,6 +257,7 @@ class IrisWebHooksInterface(IrisModuleInterface):
 
         request_rendering = hook.get('request_rendering')
         use_rendering = hook.get('use_rendering')
+        use_templating = hook.get('use_templating')
 
         if hook_object == 'case':
             user_name = data[0].user.name if data[0].user else 'N/A'
@@ -367,7 +369,21 @@ class IrisWebHooksInterface(IrisModuleInterface):
                 self.log.error('Encountered error running hook.')
                 self.log.error(str(e))
                 return
-
+        elif use_templating:
+            env = Environment()
+            template = env.from_string(request_content)
+            try:
+                request_content = template.render(data[0])
+            except Exception as e:
+                self.log.error('Encountered error when executing template')
+                self.log.error(str(e))
+                return
+            try:
+                request_data = json.loads(request_content)
+            except Exception as e:
+                self.log.error('Encountered error running hook.')
+                self.log.error(str(e))
+                return
         else:
 
             request_data = self.map_request_content(hook.get('request_body'), raw_data)
